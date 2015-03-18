@@ -1,5 +1,6 @@
 import logging
 import uuid
+import pkg_resources
 
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
@@ -8,8 +9,11 @@ import ckan.lib.helpers as h
 import ckan.logic as logic
 import ckan.model as model
 import ckan.logic.schema as schema
+from ckanext.cas.config import RolesConfig
 
-log = logging.getLogger('ckanext.cas')
+NotFound = logic.NotFound
+
+log = logging.getLogger('ckanext.odn.cas')
 
 def _no_permissions(context, msg):
     user = context['user']
@@ -40,11 +44,11 @@ def request_reset(context, data_dict):
     return _no_permissions(context, msg)
 
 def make_password():
-        # create a hard to guess password
-        out = ''
-        for n in xrange(8):
-            out += str(uuid.uuid4())
-        return out
+    # create a hard to guess password
+    out = ''
+    for n in xrange(8):
+        out += str(uuid.uuid4())
+    return out
 
 rememberer_name = None
 
@@ -91,6 +95,13 @@ class CasPlugin(plugins.SingletonPlugin):
         self.cas_url = config.get('ckanext.cas.url', None)
         self.ckan_url = config.get('ckan.site_url', None)
         log.info('cas url: %s', self.cas_url)
+        
+        # loading roles from properties file
+        default_cfg = pkg_resources.resource_filename(__name__, 'cas_roles.properties')
+        cas_role_config_path = config.get('ckanext.odn.cas.role.config.path', default_cfg)
+        log.info('Using roles properties file: {0}'.format(cas_role_config_path))
+        self.roles_config = RolesConfig(cas_role_config_path)
+        
     
     def identify(self):
         log.info('identify')
@@ -149,23 +160,23 @@ class CasPlugin(plugins.SingletonPlugin):
             #handle MOD specific roles
             #roles = self.cas_identify['SPR.Roles']
             if user_data:
-                role = toolkit.get_action('enum_roles')()
-                spr_role = user_data.get('SPR.Roles','')
-                if 'MOD-R-PO' == spr_role:
-                    org_name = user_data['SubjectID']
-                    self.create_organization(org_name)
+                # TODO check what it gives, should be list of strings
+                spr_roles = user_data.get('SPR.Roles', [])
                 
-                if 'MOD-R-MODER' == spr_role:
-                    self.create_group(role.ROLE_MODERATOR)
+                for spr_role in spr_roles:
+                    role = self.roles_config.get_role(spr_role)
                     
-                if 'MOD-R-DATA' == spr_role:
-                    self.create_group(role.ROLE_DATA_CURATOR)
+                    if not role:
+                        log.error('No CAS role configured for SPR role \'{0}\''\
+                                  .format(spr_role))
+                        continue
                     
-                if 'MOD-R-APP' == spr_role:
-                    self.create_group(role.ROLE_APP_ADMIN)
-                
-                if 'MOD-R-TRANSA' == spr_role:
-                    self.create_group(role.ROLE_SPRAVCA_TRANSFORMACII)
+                    group_name = role.group_name
+                    if role.is_org:
+                        org_name = user_data['SubjectID'] or group_name
+                        self.create_organization(org_name)
+                    else:
+                        self.create_group(group_name)
         
     def login(self):
         log.info('login')
