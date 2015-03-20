@@ -16,13 +16,11 @@ Add extension to ckan config: /etc/ckan/default/production.ini
 ckan.plugins = odn_cas
 ```
 
-Other required properties:
+Other properties:
 
 ```ApacheConf
-[app:main]
-# not 
-ckanext.cas.url = cas url ...
-ckan.site_url = ...
+# needed for proper redirect after logout
+ckan.site_url = http://my_ckan.org
 
 # absolute path to roles config files, if not given ckanext/cas/cas_roles.properties is used
 ckanext.odn.cas.role.config.path = /etc/ckan/default/roles.properties
