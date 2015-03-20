@@ -160,8 +160,8 @@ class CasPlugin(plugins.SingletonPlugin):
             #handle MOD specific roles
             #roles = self.cas_identify['SPR.Roles']
             if user_data:
-                # TODO check what it gives, should be list of strings
-                spr_roles = user_data.get('SPR.Roles', [])
+                spr_roles = []
+                spr_roles.append(user_data.get('SPR.Roles', ''))
                 
                 for spr_role in spr_roles:
                     role = self.roles_config.get_role(spr_role)
