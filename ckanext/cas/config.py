@@ -6,7 +6,9 @@ Created on 18.3.2015
 
 import ConfigParser
 import pkg_resources
-from ckanext.cas.plugin import NotFound
+
+import ckan.logic as logic
+NotFound = logic.NotFound
 
 class Role():
     
@@ -25,10 +27,9 @@ class Role():
 class RolesConfig():
     
     def __init__(self, config_path):
-        default_cfg = pkg_resources.resource_filename(__name__, config_path)
         roles_config = ConfigParser.ConfigParser()
 
-        if not roles_config.read(default_cfg):
+        if not roles_config.read(config_path):
             raise NotFound('Failed to find role properties file {0}'\
                            .format(config_path))
         
