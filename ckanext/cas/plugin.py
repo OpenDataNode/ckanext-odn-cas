@@ -20,13 +20,11 @@ def _no_permissions(context, msg):
     return {'success': False, 'msg': msg.format(user=user)}
 
 
-@logic.auth_sysadmins_check
 def user_create(context, data_dict):
     msg = toolkit._('Users cannot be created.')
     return _no_permissions(context, msg)
 
 
-@logic.auth_sysadmins_check
 def user_update(context, data_dict):
     msg = toolkit._('Users cannot be edited.')
     return _no_permissions(context, msg)
