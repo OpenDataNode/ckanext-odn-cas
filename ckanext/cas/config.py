@@ -5,10 +5,14 @@ Created on 18.3.2015
 '''
 
 import ConfigParser
-import pkg_resources
 
 import ckan.logic as logic
 NotFound = logic.NotFound
+DEFAULT_SECTION = 'role'
+ATTR_ORG_ID = 'role.attribute.name.org.id'
+ATTR_SPR_ROLES = 'role.attribute.name.roles'
+ATTR_NAME_FIRST = 'role.attribute.name.user.name.first'
+ATTR_NAME_LAST = 'role.attribute.name.user.name.last'
 
 class Role():
     
@@ -32,6 +36,11 @@ class RolesConfig():
         if not roles_config.read(config_path):
             raise NotFound('Failed to find role properties file {0}'\
                            .format(config_path))
+        
+        self.attr_org_id = roles_config.get(DEFAULT_SECTION, ATTR_ORG_ID)
+        self.attr_spr_roles = roles_config.get(DEFAULT_SECTION, ATTR_SPR_ROLES)
+        self.attr_name_first = roles_config.get(DEFAULT_SECTION, ATTR_NAME_FIRST)
+        self.attr_name_last = roles_config.get(DEFAULT_SECTION, ATTR_NAME_LAST)
         
         self.roles = []
         roles = [x for x in roles_config.sections() if x.startswith("role.")]

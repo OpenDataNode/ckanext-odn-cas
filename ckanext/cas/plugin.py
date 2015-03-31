@@ -136,9 +136,10 @@ class CasPlugin(plugins.SingletonPlugin):
                 # Create the user
                 data_dict = {
                     'password': make_password(),
-                    'name' : user_data['first_name'],
+                    'name' : user_data[self.roles_config.attr_name_first],
                     #'email' : self.cas_identify['Actor.Email'],
-                    'fullname' : user_data['first_name'] + ' ' + user_data['last_name'],
+                    'fullname' : user_data[self.roles_config.attr_name_first] + ' '\
+                                 + user_data[self.roles_config.attr_name_last],
                     'id' : user_id
                 }
                 #self.update_data_dict(data_dict, self.user_mapping, saml_info)
@@ -159,7 +160,7 @@ class CasPlugin(plugins.SingletonPlugin):
             #roles = self.cas_identify['SPR.Roles']
             if user_data:
                 spr_roles = []
-                spr_roles.append(user_data.get('SPR.Roles', ''))
+                spr_roles.append(user_data.get(self.roles_config.attr_spr_roles, ''))
                 
                 for spr_role in spr_roles:
                     role = self.roles_config.get_role(spr_role)
@@ -171,7 +172,7 @@ class CasPlugin(plugins.SingletonPlugin):
                     
                     group_name = role.group_name
                     if role.is_org:
-                        org_name = user_data['SubjectID'] or group_name
+                        org_name = user_data[self.roles_config.attr_org_id] or group_name
                         self.create_organization(org_name)
                     else:
                         self.create_group(group_name)
@@ -191,7 +192,6 @@ class CasPlugin(plugins.SingletonPlugin):
         if toolkit.c.user:
             log.info('logout abort')
             environ = toolkit.request.environ
-            log.info('environ: %s', environ)
             self.cas_identify = None
             subject_id = environ["repoze.who.identity"]['repoze.who.userid']
             client_auth = environ['repoze.who.plugins']["auth_tkt"]

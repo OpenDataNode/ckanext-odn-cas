@@ -29,10 +29,19 @@ ckanext.odn.cas.role.config.path = /etc/ckan/default/roles.properties
 Example properties looks like:
 
 ```
-[role.admin]
+[role]
+role.attribute.name.org.id = SubjectID
+role.attribute.name.roles = SPR.Roles
+role.attribute.name.user.name.first = first_name
+role.attribute.name.user.name.last = last_name
+
+[role.1]
 role.spr = MOD-R-PO
 role.group.name = app-admin
 role.is.org = True
+
+[role.2]
+...
 ```
 
 Note: There may be more roles, just the section name needs to start with 'role.'
