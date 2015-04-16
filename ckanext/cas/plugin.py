@@ -172,7 +172,8 @@ class CasPlugin(plugins.SingletonPlugin):
                     
                     group_name = role.group_name
                     if role.is_org:
-                        org_name = user_data[self.roles_config.attr_org_id] or group_name
+                        org_name = user_data.get(self.roles_config.attr_org_id, None) \
+                                    or group_name
                         self.create_organization(org_name)
                     else:
                         self.create_group(group_name)
