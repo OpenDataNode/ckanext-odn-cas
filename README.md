@@ -24,6 +24,10 @@ ckan.site_url = http://my_ckan.org
 
 # absolute path to roles config files, if not given ckanext/cas/cas_roles.properties is used
 ckanext.odn.cas.role.config.path = /etc/ckan/default/roles.properties
+
+# allows updating of user info and org member capacity
+# default value is False
+ckan.odn.cas.allow_updating = True
 ```
 
 Example properties looks like:

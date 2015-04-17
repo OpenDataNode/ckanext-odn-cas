@@ -10,19 +10,24 @@ import ckan.logic as logic
 NotFound = logic.NotFound
 DEFAULT_SECTION = 'role'
 ATTR_ORG_ID = 'role.attribute.name.org.id'
-ATTR_SPR_ROLES = 'role.attribute.name.roles'
+ATTR_ROLES = 'role.attribute.name.roles'
 ATTR_NAME_FIRST = 'role.attribute.name.user.name.first'
 ATTR_NAME_LAST = 'role.attribute.name.user.name.last'
 
 class Role():
     
     def __init__(self, config, section):
+        self.cas_role = config.get(section, 'role.name')
         self.group_name = config.get(section, 'role.group.name')
-        self.spr_role = config.get(section, 'role.spr')
-        self.is_org = config.getboolean(section, 'role.is.org')
+        self.group_role = config.get(section, 'role.group.role')
+        self.is_org = config.getboolean(section, 'role.group.is_org')
+        
+        if self.group_role not in ['member', 'editor', 'admin']:
+            raise logic.ValidationError('Group role not set for CAS role {0}'\
+                                        .format(self.cas_role))
     
     def __str__(self):
-        return "Role(spr_role = {self.spr_role}, group_name = {self.group_name}, is_org = {self.is_org})"\
+        return "Role(cas_role = {self.cas_role}, group_role = {self.group_role}, group_name = {self.group_name}, is_org = {self.is_org})"\
             .format(self=self)
     
     def __repr__(self):
@@ -38,17 +43,17 @@ class RolesConfig():
                            .format(config_path))
         
         self.attr_org_id = roles_config.get(DEFAULT_SECTION, ATTR_ORG_ID)
-        self.attr_spr_roles = roles_config.get(DEFAULT_SECTION, ATTR_SPR_ROLES)
+        self.attr_roles = roles_config.get(DEFAULT_SECTION, ATTR_ROLES)
         self.attr_name_first = roles_config.get(DEFAULT_SECTION, ATTR_NAME_FIRST)
         self.attr_name_last = roles_config.get(DEFAULT_SECTION, ATTR_NAME_LAST)
         
-        self.roles = []
+        self.cas_roles = []
         roles = [x for x in roles_config.sections() if x.startswith("role.")]
         for role in roles:
             role_obj = Role(roles_config, role)
-            self.roles.append(role_obj)
+            self.cas_roles.append(role_obj)
             
-    def get_role(self, spr_role):
-        for role in self.roles:
-            if role.spr_role == spr_role:
+    def get_role(self, cas_role):
+        for role in self.cas_roles:
+            if role.cas_role == cas_role:
                 return role

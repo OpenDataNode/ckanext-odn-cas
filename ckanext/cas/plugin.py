@@ -100,6 +100,10 @@ class CasPlugin(plugins.SingletonPlugin):
         log.info('Using roles properties file: {0}'.format(cas_role_config_path))
         self.roles_config = RolesConfig(cas_role_config_path)
         
+        self.is_updating_allowed = config.get('ckan.odn.cas.allow_updating', 'False')
+        self.is_updating_allowed = self.is_updating_allowed.lower() == 'true' 
+        log.info('is_updating_allowed: {0}'.format(self.is_updating_allowed))
+        
     
     def identify(self):
         log.info('identify')
@@ -132,48 +136,73 @@ class CasPlugin(plugins.SingletonPlugin):
             c.userobj = model.User.get(c.user)
             
             if c.userobj is None:
-                log.info("creating new user")
-                # Create the user
                 name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
                 name_last = self._get_first_value(user_data[self.roles_config.attr_name_last])
+                fullname = '{0} {1}'.format(name_first, name_last)
+                
+                log.info("creating new user")
+                # Create the user
                 data_dict = {
                     'password': make_password(),
                     'name' : name_first,
                     #'email' : self.cas_identify['Actor.Email'],
-                    'fullname' :  '{0} {1}'.format(name_first, name_last),
+                    'fullname' :  fullname,
                     'id' : user_id
                 }
-                #self.update_data_dict(data_dict, self.user_mapping, saml_info)
-                # Update the user schema to allow user creation
-                user_schema = schema.default_user_schema()
-                user_schema['id'] = [toolkit.get_validator('not_empty')]
-                user_schema['name'] = [toolkit.get_validator('not_empty')]
-                user_schema['email'] = [toolkit.get_validator('ignore_missing')]
-
+                
+                user_schema = self._get_user_validation_schema()
                 context = {'schema' : user_schema, 'ignore_auth': True}
                 user = toolkit.get_action('user_create')(context, data_dict)
                 c.userobj = model.User.get(c.user)
                 
             if user_data:
-                spr_roles = user_data.get(self.roles_config.attr_spr_roles, [])
+                if self.is_updating_allowed:
+                    self._check_and_update_user(c, user_data)
+                user_cas_roles = user_data.get(self.roles_config.attr_roles, [])
                 
-                if isinstance(spr_roles, basestring):
-                    spr_roles = [spr_roles]
+                if isinstance(user_cas_roles, basestring):
+                    user_cas_roles = [user_cas_roles]
                 
-                for spr_role in spr_roles:
-                    role = self.roles_config.get_role(spr_role)
+                for cas_role in user_cas_roles:
+                    user_role = self.roles_config.get_role(cas_role)
                     
-                    if not role:
-                        log.error('No CAS role configured for SPR role \'{0}\''\
-                                  .format(spr_role))
+                    if not user_role:
+                        log.error('No CAS role configured for user CAS role \'{0}\''\
+                                  .format(cas_role))
                         continue
                     
-                    group_name = role.group_name
-                    if role.is_org:
+                    group_name = user_role.group_name
+                    group_role = user_role.group_role
+                    if user_role.is_org:
                         org_id = self._get_first_value(user_data.get(self.roles_config.attr_org_id, None))
-                        self.create_organization(org_id or group_name)
+                        self.create_organization(org_id or group_name, group_role)
                     else:
-                        self.create_group(group_name)
+                        self.create_group(group_name, group_role)
+    
+    def _check_and_update_user(self, c, user_data):
+        name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
+        name_last = self._get_first_value(user_data[self.roles_config.attr_name_last])
+        fullname = '{0} {1}'.format(name_first, name_last)
+        if c.userobj.name != name_first or c.userobj.fullname != fullname:
+            log.info('updating user')
+            data_dict = {
+                'id': c.user,
+                'name': name_first,
+                'fullname' : fullname,
+                'password': make_password(),
+            }
+            user_schema = self._get_user_validation_schema()
+            context = {'schema' : user_schema, 'ignore_auth': True}
+            user = toolkit.get_action('user_update')(context, data_dict)
+            c.userobj = model.User.get(c.user)
+    
+    def _get_user_validation_schema(self):
+        # Update the user schema to allow user creation
+        user_schema = schema.default_user_schema()
+        user_schema['id'] = [toolkit.get_validator('not_empty'), unicode]
+        user_schema['name'] = [toolkit.get_validator('not_empty'), unicode]
+        user_schema['email'] = [toolkit.get_validator('ignore_missing'), unicode]
+        return user_schema
     
     def _get_first_value(self, data):
         if not data or isinstance(data, basestring):
@@ -224,7 +253,7 @@ class CasPlugin(plugins.SingletonPlugin):
                 h.redirect_to('cas_unauthorized')
         return (status_code, detail, headers, comment)
     
-    def create_group(self, group_name):
+    def create_group(self, group_name, user_capacity='member'):
         group = model.Group.get(group_name.lower())
         context = {'ignore_auth': True}
         site_user = toolkit.get_action('get_site_user')(context, {})
@@ -253,7 +282,7 @@ class CasPlugin(plugins.SingletonPlugin):
                 'id': group.id,
                 'object': c.userobj.id,
                 'object_type': 'user',
-                'capacity': 'member',
+                'capacity': user_capacity,
             }
             member_create_context = {
                 'user': site_user['name'],
@@ -262,8 +291,7 @@ class CasPlugin(plugins.SingletonPlugin):
 
             toolkit.get_action('member_create')(member_create_context, member_dict)
 
-    
-    def create_organization(self, org_name):
+    def create_organization(self, org_name, user_capacity='member'):
         org = model.Group.get(org_name.lower())
         context = {'ignore_auth': True}
         site_user = toolkit.get_action('get_site_user')(context, {})
@@ -284,16 +312,21 @@ class CasPlugin(plugins.SingletonPlugin):
             'id': org.id,
             'object_type': 'user',
         }
+        
+        if self.is_updating_allowed:
+            # thanks to this, it will update capacity
+            data_dict['capacity'] = user_capacity
+            
         members = toolkit.get_action('member_list')(context, data_dict)
         members = [member[0] for member in members]
         if c.userobj.id not in members:
-            # add membership
-            log.info('adding member to org')            
+            # add membership or update the capacity of member
+            log.info('adding member to org or updating his capacity (role)')            
             member_dict = {
                 'id': org.id,
                 'object': c.userobj.id,
                 'object_type': 'user',
-                'capacity': 'admin',
+                'capacity': user_capacity,
             }
             member_create_context = {
                 'user': site_user['name'],
