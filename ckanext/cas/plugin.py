@@ -134,12 +134,13 @@ class CasPlugin(plugins.SingletonPlugin):
             if c.userobj is None:
                 log.info("creating new user")
                 # Create the user
+                name_first = user_data[self.roles_config.attr_name_first]
+                name_last = user_data[self.roles_config.attr_name_last]
                 data_dict = {
                     'password': make_password(),
                     'name' : user_data[self.roles_config.attr_name_first],
                     #'email' : self.cas_identify['Actor.Email'],
-                    'fullname' : user_data[self.roles_config.attr_name_first] + ' '\
-                                 + user_data[self.roles_config.attr_name_last],
+                    'fullname' :  '{0} {1}'.format(name_first, name_last),
                     'id' : user_id
                 }
                 #self.update_data_dict(data_dict, self.user_mapping, saml_info)
