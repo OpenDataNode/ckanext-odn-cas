@@ -134,11 +134,11 @@ class CasPlugin(plugins.SingletonPlugin):
             if c.userobj is None:
                 log.info("creating new user")
                 # Create the user
-                name_first = user_data[self.roles_config.attr_name_first]
-                name_last = user_data[self.roles_config.attr_name_last]
+                name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
+                name_last = self._get_first_value(user_data[self.roles_config.attr_name_last])
                 data_dict = {
                     'password': make_password(),
-                    'name' : user_data[self.roles_config.attr_name_first],
+                    'name' : name_first,
                     #'email' : self.cas_identify['Actor.Email'],
                     'fullname' :  '{0} {1}'.format(name_first, name_last),
                     'id' : user_id
@@ -154,14 +154,11 @@ class CasPlugin(plugins.SingletonPlugin):
                 user = toolkit.get_action('user_create')(context, data_dict)
                 c.userobj = model.User.get(c.user)
                 
-            #roles = self.cas_identify['Roles'][1:-1].split(',')
-            #roles = [x.strip() for x in roles]
-            #log.info('roles: %s', roles)
-            #handle MOD specific roles
-            #roles = self.cas_identify['SPR.Roles']
             if user_data:
-                spr_roles = []
-                spr_roles.append(user_data.get(self.roles_config.attr_spr_roles, ''))
+                spr_roles = user_data.get(self.roles_config.attr_spr_roles, [])
+                
+                if isinstance(spr_roles, basestring):
+                    spr_roles = [spr_roles]
                 
                 for spr_role in spr_roles:
                     role = self.roles_config.get_role(spr_role)
@@ -173,11 +170,19 @@ class CasPlugin(plugins.SingletonPlugin):
                     
                     group_name = role.group_name
                     if role.is_org:
-                        org_name = user_data.get(self.roles_config.attr_org_id, None) \
-                                    or group_name
-                        self.create_organization(org_name)
+                        org_id = self._get_first_value(user_data.get(self.roles_config.attr_org_id, None))
+                        self.create_organization(org_id or group_name)
                     else:
                         self.create_group(group_name)
+    
+    def _get_first_value(self, data):
+        if not data or isinstance(data, basestring):
+            return data
+        elif isinstance(data, list):
+            return data[0]
+        else:
+            log.warning("Not list nor string: {0}".format(data))
+            return data
         
     def login(self):
         log.info('login')
