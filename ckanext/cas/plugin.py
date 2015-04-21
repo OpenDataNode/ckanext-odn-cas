@@ -144,7 +144,7 @@ class CasPlugin(plugins.SingletonPlugin):
                 # Create the user
                 data_dict = {
                     'password': make_password(),
-                    'name' : name_first,
+                    'name' : user_id,
                     #'email' : self.cas_identify['Actor.Email'],
                     'fullname' :  fullname,
                     'id' : user_id
