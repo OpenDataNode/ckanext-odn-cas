@@ -183,11 +183,11 @@ class CasPlugin(plugins.SingletonPlugin):
         name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
         name_last = self._get_first_value(user_data[self.roles_config.attr_name_last])
         fullname = '{0} {1}'.format(name_first, name_last)
-        if c.userobj.name != name_first or c.userobj.fullname != fullname:
+        if c.userobj.name != c.user or c.userobj.fullname != fullname:
             log.info('updating user')
             data_dict = {
                 'id': c.user,
-                'name': name_first,
+                'name': c.user,
                 'fullname' : fullname,
                 'password': make_password(),
             }
