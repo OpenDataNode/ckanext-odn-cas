@@ -56,12 +56,17 @@ def delete_cookies():
     if rememberer_name is None:
         plugins = toolkit.request.environ['repoze.who.plugins']
         cas_plugin = plugins.get('casauth')
-        rememberer_name = cas_plugin.rememberer_name
-        log.info("rememberer_name: %s", rememberer_name)
-    base.response.delete_cookie(rememberer_name)
-    # We seem to end up with an extra cookie so kill this too
-    domain = toolkit.request.environ['HTTP_HOST']
-    base.response.delete_cookie(rememberer_name, domain='.' + domain)
+        if cas_plugin:
+            rememberer_name = cas_plugin.rememberer_name
+            log.info("rememberer_name: %s", rememberer_name)
+        else:
+            log.info("no casauth plugin")
+    
+    if rememberer_name:
+        base.response.delete_cookie(rememberer_name)
+        # We seem to end up with an extra cookie so kill this too
+        domain = toolkit.request.environ['HTTP_HOST']
+        base.response.delete_cookie(rememberer_name, domain='.' + domain)
 
 class CasPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IAuthenticator)
@@ -111,9 +116,6 @@ class CasPlugin(plugins.SingletonPlugin):
         environ = toolkit.request.environ
         user = environ.get('REMOTE_USER', '')
         log.info('user %s', user)
-        #if not user:
-        #    user = environ.get("repoze.who.identity", "")
-        #    log.info("repoze.who.identity: '%s'" % user)
         
         if user:
             #if not self.cas_identify:          
@@ -178,6 +180,10 @@ class CasPlugin(plugins.SingletonPlugin):
                         self.create_organization(org_id or group_name, group_role)
                     else:
                         self.create_group(group_name, group_role)
+        else:
+            log.info("redirect to login")
+            delete_cookies()
+            h.redirect_to(controller='user', action='login')
     
     def _check_and_update_user(self, c, user_data):
         name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
@@ -235,17 +241,6 @@ class CasPlugin(plugins.SingletonPlugin):
             client_cas = environ['repoze.who.plugins']["casauth"]
             log.info('cas methods: %s', dir(client_cas))
             environ['rwpc.logout']= self.ckan_url
-            #return base.abort(401)
-            #log.info('logout')
-            #environ = toolkit.request.environ
-            #log.info('environ: %s', environ)
-            ##subject_id = environ["repoze.who.identity"]['repoze.who.userid']
-            #client = environ['repoze.who.plugins']["casauth"]
-            #identity = environ['repoze.who.identity']
-            #client.forget(environ, identity)
-            
-            #delete_cookies()
-            #h.redirect_to(controller='user', action='logged_out')
         
     def abort(self, status_code, detail, headers, comment):
         log.info('abort')
