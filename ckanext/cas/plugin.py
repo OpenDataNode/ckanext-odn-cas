@@ -1,6 +1,7 @@
 import logging
 import uuid
 import pkg_resources
+import re
 
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
@@ -181,9 +182,11 @@ class CasPlugin(plugins.SingletonPlugin):
                     else:
                         self.create_group(group_name, group_role)
         else:
-            log.info("redirect to login")
-            delete_cookies()
-            h.redirect_to(controller='user', action='login')
+            # don't redirect API
+            if not re.match(".*/api(/\\d+)?/action/.*", environ['PATH_INFO']):
+                log.info("redirect to login")
+                delete_cookies()
+                h.redirect_to(controller='user', action='login')
     
     def _check_and_update_user(self, c, user_data):
         name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
