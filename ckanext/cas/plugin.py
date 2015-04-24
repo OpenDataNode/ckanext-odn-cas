@@ -1,5 +1,7 @@
 import logging
 import uuid
+import pkg_resources
+import re
 
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
@@ -8,21 +10,22 @@ import ckan.lib.helpers as h
 import ckan.logic as logic
 import ckan.model as model
 import ckan.logic.schema as schema
+from ckanext.cas.config import RolesConfig
 
-log = logging.getLogger('ckanext.cas')
+NotFound = logic.NotFound
+
+log = logging.getLogger('ckanext.odn.cas')
 
 def _no_permissions(context, msg):
     user = context['user']
     return {'success': False, 'msg': msg.format(user=user)}
 
 
-@logic.auth_sysadmins_check
 def user_create(context, data_dict):
     msg = toolkit._('Users cannot be created.')
     return _no_permissions(context, msg)
 
 
-@logic.auth_sysadmins_check
 def user_update(context, data_dict):
     msg = toolkit._('Users cannot be edited.')
     return _no_permissions(context, msg)
@@ -40,11 +43,11 @@ def request_reset(context, data_dict):
     return _no_permissions(context, msg)
 
 def make_password():
-        # create a hard to guess password
-        out = ''
-        for n in xrange(8):
-            out += str(uuid.uuid4())
-        return out
+    # create a hard to guess password
+    out = ''
+    for n in xrange(8):
+        out += str(uuid.uuid4())
+    return out
 
 rememberer_name = None
 
@@ -54,12 +57,17 @@ def delete_cookies():
     if rememberer_name is None:
         plugins = toolkit.request.environ['repoze.who.plugins']
         cas_plugin = plugins.get('casauth')
-        rememberer_name = cas_plugin.rememberer_name
-        log.info("rememberer_name: %s", rememberer_name)
-    base.response.delete_cookie(rememberer_name)
-    # We seem to end up with an extra cookie so kill this too
-    domain = toolkit.request.environ['HTTP_HOST']
-    base.response.delete_cookie(rememberer_name, domain='.' + domain)
+        if cas_plugin:
+            rememberer_name = cas_plugin.rememberer_name
+            log.info("rememberer_name: %s", rememberer_name)
+        else:
+            log.info("no casauth plugin")
+    
+    if rememberer_name:
+        base.response.delete_cookie(rememberer_name)
+        # We seem to end up with an extra cookie so kill this too
+        domain = toolkit.request.environ['HTTP_HOST']
+        base.response.delete_cookie(rememberer_name, domain='.' + domain)
 
 class CasPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IAuthenticator)
@@ -91,6 +99,17 @@ class CasPlugin(plugins.SingletonPlugin):
         self.cas_url = config.get('ckanext.cas.url', None)
         self.ckan_url = config.get('ckan.site_url', None)
         log.info('cas url: %s', self.cas_url)
+        
+        # loading roles from properties file
+        default_cfg = pkg_resources.resource_filename(__name__, 'cas_roles.properties')
+        cas_role_config_path = config.get('ckanext.odn.cas.role.config.path', default_cfg)
+        log.info('Using roles properties file: {0}'.format(cas_role_config_path))
+        self.roles_config = RolesConfig(cas_role_config_path)
+        
+        self.is_updating_allowed = config.get('ckan.odn.cas.allow_updating', 'False')
+        self.is_updating_allowed = self.is_updating_allowed.lower() == 'true' 
+        log.info('is_updating_allowed: {0}'.format(self.is_updating_allowed))
+        
     
     def identify(self):
         log.info('identify')
@@ -98,9 +117,6 @@ class CasPlugin(plugins.SingletonPlugin):
         environ = toolkit.request.environ
         user = environ.get('REMOTE_USER', '')
         log.info('user %s', user)
-        #if not user:
-        #    user = environ.get("repoze.who.identity", "")
-        #    log.info("repoze.who.identity: '%s'" % user)
         
         if user:
             #if not self.cas_identify:          
@@ -123,49 +139,92 @@ class CasPlugin(plugins.SingletonPlugin):
             c.userobj = model.User.get(c.user)
             
             if c.userobj is None:
+                name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
+                name_last = self._get_first_value(user_data[self.roles_config.attr_name_last])
+                fullname = '{0} {1}'.format(name_first, name_last)
+                
                 log.info("creating new user")
                 # Create the user
                 data_dict = {
                     'password': make_password(),
-                    'name' : user_data['first_name'],
+                    'name' : user_id,
                     #'email' : self.cas_identify['Actor.Email'],
-                    'fullname' : user_data['first_name'] + ' ' + user_data['last_name'],
+                    'fullname' :  fullname,
                     'id' : user_id
                 }
-                #self.update_data_dict(data_dict, self.user_mapping, saml_info)
-                # Update the user schema to allow user creation
-                user_schema = schema.default_user_schema()
-                user_schema['id'] = [toolkit.get_validator('not_empty')]
-                user_schema['name'] = [toolkit.get_validator('not_empty')]
-                user_schema['email'] = [toolkit.get_validator('ignore_missing')]
-
+                
+                user_schema = self._get_user_validation_schema()
                 context = {'schema' : user_schema, 'ignore_auth': True}
                 user = toolkit.get_action('user_create')(context, data_dict)
                 c.userobj = model.User.get(c.user)
                 
-            #roles = self.cas_identify['Roles'][1:-1].split(',')
-            #roles = [x.strip() for x in roles]
-            #log.info('roles: %s', roles)
-            #handle MOD specific roles
-            #roles = self.cas_identify['SPR.Roles']
             if user_data:
-                role = toolkit.get_action('enum_roles')()
-                spr_role = user_data.get('SPR.Roles','')
-                if 'MOD-R-PO' == spr_role:
-                    org_name = user_data['SubjectID']
-                    self.create_organization(org_name)
+                if self.is_updating_allowed:
+                    self._check_and_update_user(c, user_data)
+                user_cas_roles = user_data.get(self.roles_config.attr_roles, [])
                 
-                if 'MOD-R-MODER' == spr_role:
-                    self.create_group(role.ROLE_MODERATOR)
-                    
-                if 'MOD-R-DATA' == spr_role:
-                    self.create_group(role.ROLE_DATA_CURATOR)
-                    
-                if 'MOD-R-APP' == spr_role:
-                    self.create_group(role.ROLE_APP_ADMIN)
+                if isinstance(user_cas_roles, basestring):
+                    user_cas_roles = [user_cas_roles]
                 
-                if 'MOD-R-TRANSA' == spr_role:
-                    self.create_group(role.ROLE_SPRAVCA_TRANSFORMACII)
+                for cas_role in user_cas_roles:
+                    user_role = self.roles_config.get_role(cas_role)
+                    
+                    if not user_role:
+                        log.error('No CAS role configured for user CAS role \'{0}\''\
+                                  .format(cas_role))
+                        continue
+                    
+                    group_name = user_role.group_name
+                    group_role = user_role.group_role
+                    if user_role.is_org:
+                        org_id = self._get_first_value(user_data.get(self.roles_config.attr_org_id, None))
+                        self.create_organization(org_id or group_name, group_role)
+                    else:
+                        self.create_group(group_name, group_role)
+        else:
+            # don't redirect API, resource files, datastore dumps
+            do_redirect = not re.match(".*/api(/\\d+)?/action/.*", environ['PATH_INFO']) \
+                and not re.match(r".*/dataset/.+/resource/.+/download/.+", environ['PATH_INFO']) \
+                and not re.match(r".*/datastore/dump/.+", environ['PATH_INFO'])
+                    
+            if do_redirect:
+                log.info("redirect to login")
+                delete_cookies()
+                h.redirect_to(controller='user', action='login')
+    
+    def _check_and_update_user(self, c, user_data):
+        name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
+        name_last = self._get_first_value(user_data[self.roles_config.attr_name_last])
+        fullname = '{0} {1}'.format(name_first, name_last)
+        if c.userobj.name != c.user or c.userobj.fullname != fullname:
+            log.info('updating user')
+            data_dict = {
+                'id': c.user,
+                'name': c.user,
+                'fullname' : fullname,
+                'password': make_password(),
+            }
+            user_schema = self._get_user_validation_schema()
+            context = {'schema' : user_schema, 'ignore_auth': True}
+            user = toolkit.get_action('user_update')(context, data_dict)
+            c.userobj = model.User.get(c.user)
+    
+    def _get_user_validation_schema(self):
+        # Update the user schema to allow user creation
+        user_schema = schema.default_user_schema()
+        user_schema['id'] = [toolkit.get_validator('not_empty'), unicode]
+        user_schema['name'] = [toolkit.get_validator('not_empty'), unicode]
+        user_schema['email'] = [toolkit.get_validator('ignore_missing'), unicode]
+        return user_schema
+    
+    def _get_first_value(self, data):
+        if not data or isinstance(data, basestring):
+            return data
+        elif isinstance(data, list):
+            return data[0]
+        else:
+            log.warning("Not list nor string: {0}".format(data))
+            return data
         
     def login(self):
         log.info('login')
@@ -182,7 +241,6 @@ class CasPlugin(plugins.SingletonPlugin):
         if toolkit.c.user:
             log.info('logout abort')
             environ = toolkit.request.environ
-            log.info('environ: %s', environ)
             self.cas_identify = None
             subject_id = environ["repoze.who.identity"]['repoze.who.userid']
             client_auth = environ['repoze.who.plugins']["auth_tkt"]
@@ -190,17 +248,6 @@ class CasPlugin(plugins.SingletonPlugin):
             client_cas = environ['repoze.who.plugins']["casauth"]
             log.info('cas methods: %s', dir(client_cas))
             environ['rwpc.logout']= self.ckan_url
-            #return base.abort(401)
-            #log.info('logout')
-            #environ = toolkit.request.environ
-            #log.info('environ: %s', environ)
-            ##subject_id = environ["repoze.who.identity"]['repoze.who.userid']
-            #client = environ['repoze.who.plugins']["casauth"]
-            #identity = environ['repoze.who.identity']
-            #client.forget(environ, identity)
-            
-            #delete_cookies()
-            #h.redirect_to(controller='user', action='logged_out')
         
     def abort(self, status_code, detail, headers, comment):
         log.info('abort')
@@ -208,7 +255,7 @@ class CasPlugin(plugins.SingletonPlugin):
                 h.redirect_to('cas_unauthorized')
         return (status_code, detail, headers, comment)
     
-    def create_group(self, group_name):
+    def create_group(self, group_name, user_capacity='member'):
         group = model.Group.get(group_name.lower())
         context = {'ignore_auth': True}
         site_user = toolkit.get_action('get_site_user')(context, {})
@@ -237,7 +284,7 @@ class CasPlugin(plugins.SingletonPlugin):
                 'id': group.id,
                 'object': c.userobj.id,
                 'object_type': 'user',
-                'capacity': 'member',
+                'capacity': user_capacity,
             }
             member_create_context = {
                 'user': site_user['name'],
@@ -246,8 +293,7 @@ class CasPlugin(plugins.SingletonPlugin):
 
             toolkit.get_action('member_create')(member_create_context, member_dict)
 
-    
-    def create_organization(self, org_name):
+    def create_organization(self, org_name, user_capacity='member'):
         org = model.Group.get(org_name.lower())
         context = {'ignore_auth': True}
         site_user = toolkit.get_action('get_site_user')(context, {})
@@ -256,7 +302,8 @@ class CasPlugin(plugins.SingletonPlugin):
         if not org:
             log.info('creating org: %s', org_name)      
             context = {'user': c.userobj.id, 'ignore_auth': True}
-            data_dict = {'name': org_name.lower(),
+            data_dict = {'id': org_name,
+                         'name': org_name.lower(),
                          'title': org_name
             }
             org = toolkit.get_action('organization_create')(context, data_dict)
@@ -267,16 +314,21 @@ class CasPlugin(plugins.SingletonPlugin):
             'id': org.id,
             'object_type': 'user',
         }
+        
+        if self.is_updating_allowed:
+            # thanks to this, it will update capacity
+            data_dict['capacity'] = user_capacity
+            
         members = toolkit.get_action('member_list')(context, data_dict)
         members = [member[0] for member in members]
         if c.userobj.id not in members:
-            # add membership
-            log.info('adding member to org')            
+            # add membership or update the capacity of member
+            log.info('adding member to org or updating his capacity (role)')            
             member_dict = {
                 'id': org.id,
                 'object': c.userobj.id,
                 'object_type': 'user',
-                'capacity': 'admin',
+                'capacity': user_capacity,
             }
             member_create_context = {
                 'user': site_user['name'],
