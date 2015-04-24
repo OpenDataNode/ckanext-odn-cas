@@ -182,8 +182,12 @@ class CasPlugin(plugins.SingletonPlugin):
                     else:
                         self.create_group(group_name, group_role)
         else:
-            # don't redirect API
-            if not re.match(".*/api(/\\d+)?/action/.*", environ['PATH_INFO']):
+            # don't redirect API, resource files, datastore dumps
+            do_redirect = not re.match(".*/api(/\\d+)?/action/.*", environ['PATH_INFO'])
+                    and not re.match(r".*/dataset/.+/resource/.+/download/.+", environ['PATH_INFO'])
+                    and not re.match(r".*/datastore/dump/.+", environ['PATH_INFO'])
+                    
+            if do_redirect:
                 log.info("redirect to login")
                 delete_cookies()
                 h.redirect_to(controller='user', action='login')
