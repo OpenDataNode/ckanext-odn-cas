@@ -34,15 +34,23 @@ Example properties looks like:
 
 ```
 [role]
-role.attribute.name.org.id = SubjectID
+role.attribute.name.org.id = ou
 role.attribute.name.roles = SPR.Roles
-role.attribute.name.user.name.first = first_name
-role.attribute.name.user.name.last = last_name
+role.attribute.name.user.name.first = givenName
+role.attribute.name.user.name.last = sn
+
+# EXAMPLE ROLE
+# [role.N]
+# role.spr = UserRoleInCAS # CAS role
+# role.group.role = member | editor | admin # CKAN role within organization/group
+# role.group.name = OrganizationId | OrganizationName | GroupId | GroupName
+# role.group.is_org = True | False
 
 [role.1]
-role.spr = MOD-R-PO
-role.group.name = app-admin
-role.is.org = True
+role.name = Administrator
+role.group.role = admin
+role.group.name = comsode
+role.group.is_org = True
 
 [role.2]
 ...
