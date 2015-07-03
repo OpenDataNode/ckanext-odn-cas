@@ -13,6 +13,7 @@ ATTR_ORG_ID = 'role.attribute.name.org.id'
 ATTR_ROLES = 'role.attribute.name.roles'
 ATTR_NAME_FIRST = 'role.attribute.name.user.name.first'
 ATTR_NAME_LAST = 'role.attribute.name.user.name.last'
+ATTR_ACTOR_ID = 'role.attribute.actor.id'
 
 class Role():
     
@@ -42,10 +43,11 @@ class RolesConfig():
             raise NotFound('Failed to find role properties file {0}'\
                            .format(config_path))
         
-        self.attr_org_id = roles_config.get(DEFAULT_SECTION, ATTR_ORG_ID)
+#         self.attr_org_id = roles_config.get(DEFAULT_SECTION, ATTR_ORG_ID)
         self.attr_roles = roles_config.get(DEFAULT_SECTION, ATTR_ROLES)
         self.attr_name_first = roles_config.get(DEFAULT_SECTION, ATTR_NAME_FIRST)
         self.attr_name_last = roles_config.get(DEFAULT_SECTION, ATTR_NAME_LAST)
+        self.attr_actor_id = roles_config.get(DEFAULT_SECTION, ATTR_ACTOR_ID)
         
         self.cas_roles = []
         roles = [x for x in roles_config.sections() if x.startswith("role.")]
