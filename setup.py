@@ -13,7 +13,7 @@ setup(
     author='Martin Virag, Dominik Kapisinsky',
     author_email='martin.virag@eea.sk',
     url='https://github.com/OpenDataNode/ckanext-odn-cas',
-    license='',
+    license='AGPL',
     packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
     namespace_packages=['ckanext', 'ckanext.cas'],
     package_data={'': [
