@@ -60,7 +60,7 @@ def delete_cookies():
         cas_plugin = plugins.get('casauth')
         if cas_plugin:
             rememberer_name = cas_plugin.rememberer_name
-            log.info("rememberer_name: %s", rememberer_name)
+            log.info(u"rememberer_name: {0}".format(rememberer_name))
         else:
             log.info("no casauth plugin")
     
@@ -99,17 +99,17 @@ class CasPlugin(plugins.SingletonPlugin):
     def configure(self, config):
         self.cas_url = config.get('ckanext.cas.url', None)
         self.ckan_url = config.get('ckan.site_url', None)
-        log.info('cas url: %s', self.cas_url)
+        log.info(u'cas url: {0}'.format(self.cas_url))
         
         # loading roles from properties file
         default_cfg = pkg_resources.resource_filename(__name__, 'cas_roles.properties')
         cas_role_config_path = config.get('ckanext.odn.cas.role.config.path', default_cfg)
-        log.info('Using roles properties file: {0}'.format(cas_role_config_path))
+        log.info(u'Using roles properties file: {0}'.format(cas_role_config_path))
         self.roles_config = RolesConfig(cas_role_config_path)
         
         self.is_updating_allowed = config.get('ckan.odn.cas.allow_updating', 'False')
         self.is_updating_allowed = self.is_updating_allowed.lower() == 'true' 
-        log.info('is_updating_allowed: {0}'.format(self.is_updating_allowed))
+        log.info(u'is_updating_allowed: {0}'.format(self.is_updating_allowed))
         
     
     def identify(self):
@@ -117,16 +117,16 @@ class CasPlugin(plugins.SingletonPlugin):
         c = toolkit.c
         environ = toolkit.request.environ
         org_id = environ.get('REMOTE_USER', '')
-        log.info('org_id %s', org_id)
+        log.info(u'org_id {0}'.format(org_id))
         
         if org_id:
             #if not self.cas_identify:          
             identity = environ.get("repoze.who.identity", {})
-            log.info('identity: %s', identity.keys())
+            log.info(u'identity: {0}'.format(identity.keys()))
             user_data = identity.get("attributes", {})
             user_id = None
             
-            log.info('attributes: %s', user_data)
+            log.info(u'attributes: {0}'.format(user_data))
             
             if user_data:
                 self.cas_identify = user_data
@@ -136,14 +136,14 @@ class CasPlugin(plugins.SingletonPlugin):
                 delete_cookies()
                 h.redirect_to(controller='user', action='logged_out')
                 
-            log.info('actor id : %s', user_id)
-            log.info('actor id from session: {0}'.format(pylons.session.get('ckanext-cas-actorid')))
+            log.info(u'actor id : {0}'.format(user_id))
+            log.info(u'actor id from session: {0}'.format(pylons.session.get('ckanext-cas-actorid')))
                         
             # create actor
             if user_id and not model.User.get(user_id):
                 name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
                 name_last = self._get_first_value(user_data[self.roles_config.attr_name_last])
-                fullname = '{0} {1}'.format(name_first, name_last)
+                fullname = u'{0} {1}'.format(name_first, name_last)
                 self.create_user(user_id, fullname)
             elif user_id and self.is_updating_allowed:
                 self._check_and_update_user(c, user_id, user_data)
@@ -169,7 +169,7 @@ class CasPlugin(plugins.SingletonPlugin):
                     user_role = self.roles_config.get_role(cas_role)
                     
                     if not user_role:
-                        log.error('No CAS role configured for user CAS role \'{0}\''\
+                        log.error(u'No CAS role configured for user CAS role \'{0}\''\
                                   .format(cas_role))
                         continue
                     
@@ -192,13 +192,13 @@ class CasPlugin(plugins.SingletonPlugin):
                 h.redirect_to(controller='user', action='login')
     
     def _login_user(self, user_id):
-        log.debug('logging in as {0}'.format(user_id))
+        log.debug(u'logging in as {0}'.format(user_id))
         c = toolkit.c
         c.user = user_id
         c.userobj = model.User.get(c.user)
     
     def create_user(self, user_id, fullname):
-        log.info("creating new user: {0}".format(user_id))
+        log.info(u"creating new user: {0}".format(user_id))
         # Create the user
         data_dict = {
             'password': make_password(),
@@ -218,7 +218,7 @@ class CasPlugin(plugins.SingletonPlugin):
         
         name_first = self._get_first_value(user_data[self.roles_config.attr_name_first])
         name_last = self._get_first_value(user_data[self.roles_config.attr_name_last])
-        fullname = '{0} {1}'.format(name_first, name_last)
+        fullname = u'{0} {1}'.format(name_first, name_last)
         if userobj.name != user_id or userobj.fullname != fullname:
             log.info('updating user')
             data_dict = {
@@ -246,7 +246,7 @@ class CasPlugin(plugins.SingletonPlugin):
         elif isinstance(data, list):
             return data[0]
         else:
-            log.warning("Not list nor string: {0}".format(data))
+            log.warning(u"Not list nor string: {0}".format(data))
             return data
         
     def login(self):
@@ -271,9 +271,9 @@ class CasPlugin(plugins.SingletonPlugin):
             self.cas_identify = None
             subject_id = environ["repoze.who.identity"]['repoze.who.userid']
             client_auth = environ['repoze.who.plugins']["auth_tkt"]
-            log.info('auth tkt methods: %s', dir(client_auth))
+            log.info(u'auth tkt methods: {0}'.format(dir(client_auth)))
             client_cas = environ['repoze.who.plugins']["casauth"]
-            log.info('cas methods: %s', dir(client_cas))
+            log.info(u'cas methods: {0}'.format(dir(client_cas)))
             environ['rwpc.logout']= self.ckan_url
         
         
@@ -288,9 +288,9 @@ class CasPlugin(plugins.SingletonPlugin):
         c = toolkit.c
         context = {'ignore_auth': True}
         site_user = toolkit.get_action('get_site_user')(context, {})
-        log.info('site user: %s', site_user)
+        log.info(u'site user: {0}'.format(site_user))
         if not group:
-            log.info('creating group: %s', group_name)      
+            log.info(u'creating group: {0}'.format(group_name))      
             context = {'user': site_user['name']}
             data_dict = {'id': group_name,
                          'name': group_name.lower(),
@@ -306,7 +306,7 @@ class CasPlugin(plugins.SingletonPlugin):
         org = model.Group.get(org_name)
         c = toolkit.c
         if not org:
-            log.info('creating org: %s', org_name)
+            log.info(u'creating org: {0}'.format(org_name))
             context = {'user': c.userobj.id, 'ignore_auth': True}
             data_dict = {'id': org_name,
                          'name': org_name.lower(),
