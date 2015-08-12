@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version = '0.4.1'
+version = '1.1.2-SNAPSHOT'
 
 setup(
     name='ckanext-odn-cas',
