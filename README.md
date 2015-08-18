@@ -83,4 +83,4 @@ and creates .pot file. Next using commands (step 2 or 3) it creates or updates .
 Licenses
 -------
 
-?
+[GNU Affero General Public License, Version 3.0](http://www.gnu.org/licenses/agpl-3.0.html) is used for licensing of the code (see LICENSE)
