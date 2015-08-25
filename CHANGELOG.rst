@@ -2,6 +2,11 @@
 Changelog
 ---------
 
+v1.2.0-SNAPSHOT 2015-08-25
+
+New features:
+ * added support for single sign out
+
 v1.1.2 2015-08-18
 
 Miscellaneous:
