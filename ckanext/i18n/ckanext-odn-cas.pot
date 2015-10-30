@@ -2,36 +2,35 @@
 # Copyright (C) 2015 ORGANIZATION
 # This file is distributed under the same license as the ckanext-odn-cas
 # project.
-# 
-# Translators:
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2015
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2015.
+#
+#, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: ckanext-odn-cas\n"
+"Project-Id-Version: ckanext-odn-cas 1.2.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
 "POT-Creation-Date: 2015-10-30 13:07+0100\n"
-"PO-Revision-Date: 2015-10-30 14:18+0000\n"
-"Last-Translator: Sveto Krchnavy\n"
-"Language-Team: Slovak (http://www.transifex.com/opendatanode/ckanext-odn-cas/language/sk/)\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 0.9.6\n"
-"Language: sk\n"
-"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
 
 #: ckanext/cas/plugin.py:50
 msgid "Users cannot be created."
-msgstr "Používateľov nemožno vytvárať."
+msgstr ""
 
 #: ckanext/cas/plugin.py:55
 msgid "Users cannot be edited."
-msgstr "Používateľov nemožno upravovať."
+msgstr ""
 
 #: ckanext/cas/plugin.py:61 ckanext/cas/plugin.py:67
 msgid "Users cannot reset passwords."
-msgstr "Používateľ nemá povolenie resetovať heslo."
+msgstr ""
 
 #: ckanext/cas/plugin.py:435
 msgid "You are not authorized to do this"
-msgstr "Nemáte povolenie na túto akciu."
+msgstr ""
+
