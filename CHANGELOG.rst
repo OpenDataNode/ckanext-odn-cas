@@ -2,7 +2,12 @@
 Changelog
 ---------
 
-v1.2.0-SNAPSHOT 2015-08-25
+v1.2.1-SNAPSHOT
+
+New features:
+* translation using transifex
+
+v1.2.0 2015-08-25
 
 New features:
  * added support for single sign out
